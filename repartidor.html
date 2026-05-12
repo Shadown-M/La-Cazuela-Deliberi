@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Repartidor — La Cazuela</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, update, remove }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyA-z333HglBV6SEiXsAqZeJwhaLh2em_kE",
+    authDomain: "la-cazuela-851f0.firebaseapp.com",
+    databaseURL: "https://la-cazuela-851f0-default-rtdb.firebaseio.com",
+    projectId: "la-cazuela-851f0",
+    storageBucket: "la-cazuela-851f0.firebasestorage.app",
+    messagingSenderId: "540348719203",
+    appId: "1:540348719203:web:b9b3e2bd41793957445856"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+  window._db      = db;
+  window._ref     = ref;
+  window._onValue = onValue;
+  window._update  = update;
+  window._remove  = remove;
+  window._firebaseReady = true;
+  document.dispatchEvent(new Event('firebaseReady'));
+</script>
+
+<style>
+:root{
+  --brand:#C8380A; --brand-dark:#8B2206; --brand-light:#FFF0EB;
+  --dark:#1A1208; --mid:#5A4535;
+  --light:#F7F2EE; --white:#FFFDF9; --border:#E8DDD5;
+  --success:#1A6B3C; --success-bg:#E8F5EE; --success-light:#D4EDDA;
+  --danger:#E24B4A; --danger-bg:#FEF2F2;
+  --warn:#D97706; --warn-bg:#FFFBEB;
+  --radius:14px; --shadow:0 2px 20px rgba(26,18,8,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#F0EBE3;font-family:'DM Sans',sans-serif;color:var(--dark);min-height:100vh}
+
+/* ── LOGIN ── */
+#login-screen{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,#1A4731 0%,#2D7A4F 60%,#3A9E68 100%);
+  position:relative;overflow:hidden;
+}
+#login-screen::before{
+  content:'🛵';position:absolute;font-size:200px;opacity:.06;
+  top:50%;left:50%;transform:translate(-50%,-60%);pointer-events:none;
+}
+.login-box{
+  background:#fff;border-radius:22px;padding:36px 28px;width:100%;max-width:360px;
+  box-shadow:0 24px 70px rgba(0,0,0,.3);text-align:center;position:relative;z-index:1;
+}
+.login-icon{font-size:56px;margin-bottom:8px;display:block}
+.login-title{font-family:'Playfair Display',serif;font-size:22px;margin-bottom:4px;color:var(--dark)}
+.login-sub{font-size:12px;color:var(--mid);margin-bottom:24px}
+.login-input{
+  width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;
+  font-family:'DM Sans',sans-serif;font-size:15px;color:var(--dark);outline:none;
+  margin-bottom:12px;transition:.2s;text-align:left;
+}
+.login-input:focus{border-color:#2D7A4F}
+.login-btn{
+  width:100%;padding:14px;background:#2D7A4F;color:#fff;border:none;
+  border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:.15s;
+}
+.login-btn:hover{background:#1A4731}
+.login-err{color:var(--danger);font-size:12px;margin-top:8px;display:none}
+.login-err.show{display:block}
+
+/* ── APP ── */
+#app-screen{display:none}
+
+/* ── TOPBAR ── */
+.topbar{
+  background:linear-gradient(135deg,#1A4731,#2D7A4F);
+  padding:14px 20px;display:flex;justify-content:space-between;
+  align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.2);
+  position:sticky;top:0;z-index:50;
+}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-icon{font-size:24px}
+.topbar-title{font-family:'Playfair Display',serif;font-size:17px;color:#fff;line-height:1.1}
+.topbar-sub{font-size:10px;color:rgba(255,255,255,.7)}
+.btn-logout{
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);
+  color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;
+  font-family:'DM Sans',sans-serif;transition:.15s;
+}
+.btn-logout:hover{background:rgba(255,255,255,.25)}
+
+/* ── CONTAINER ── */
+.container{max-width:680px;margin:0 auto;padding:16px 14px 100px}
+
+/* ── STATS BAR ── */
+.stats-bar{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;
+}
+.stat-card{
+  background:var(--white);border:1px solid var(--border);border-radius:12px;
+  padding:12px;text-align:center;box-shadow:var(--shadow);
+}
+.stat-num{font-size:28px;font-weight:700;line-height:1}
+.stat-lbl{font-size:10px;color:var(--mid);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.stat-card.s-pending .stat-num{color:var(--warn)}
+.stat-card.s-ready   .stat-num{color:#2D7A4F}
+.stat-card.s-done    .stat-num{color:var(--mid)}
+
+/* ── FILTROS ── */
+.filter-tabs{
+  display:flex;gap:6px;margin-bottom:14px;
+  background:var(--white);border:1px solid var(--border);
+  border-radius:12px;padding:5px;box-shadow:var(--shadow);
+}
+.f-tab{
+  flex:1;padding:9px 6px;border-radius:8px;border:none;background:transparent;
+  font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;
+  color:var(--mid);cursor:pointer;transition:.15s;text-align:center;
+}
+.f-tab.active{background:#2D7A4F;color:#fff;box-shadow:0 2px 6px rgba(45,122,79,.35)}
+.f-tab .f-cnt{
+  display:inline-block;background:rgba(255,255,255,.3);border-radius:10px;
+  padding:1px 6px;font-size:10px;margin-left:4px;
+}
+.f-tab:not(.active) .f-cnt{background:var(--border);color:var(--mid)}
+
+/* ── EMPTY ── */
+.empty-state{
+  text-align:center;padding:52px 24px;
+  background:var(--white);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+}
+.empty-icon{font-size:52px;margin-bottom:10px}
+.empty-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--dark);margin-bottom:6px}
+.empty-sub{font-size:13px;color:var(--mid)}
+
+/* ── PEDIDO CARD ── */
+.pedido-card{
+  background:var(--white);border:1px solid var(--border);
+  border-radius:var(--radius);margin-bottom:12px;
+  box-shadow:var(--shadow);overflow:hidden;transition:all .25s;
+  position:relative;
+}
+.pedido-card.is-ready{
+  border-color:#2D7A4F;
+  box-shadow:0 0 0 2px rgba(45,122,79,.15), var(--shadow);
+}
+.pedido-card.is-delivered{
+  opacity:.45;transform:scale(.98);
+}
+
+/* ready stripe */
+.ready-stripe{
+  height:4px;background:linear-gradient(90deg,#2D7A4F,#3A9E68);
+  display:none;
+}
+.is-ready .ready-stripe{display:block}
+
+/* ── CARD HEADER ── */
+.card-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px 8px;
+}
+.card-hdr-left{display:flex;align-items:center;gap:8px}
+.ped-num{
+  font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--brand);
+}
+.ped-time{font-size:11px;color:var(--mid);display:flex;align-items:center;gap:4px}
+.badge-status{
+  padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.badge-status.b-pending{background:var(--warn-bg);color:var(--warn)}
+.badge-status.b-ready  {background:var(--success-bg);color:var(--success)}
+.badge-status.b-done   {background:#F3F4F6;color:#9CA3AF}
+
+/* ── CARD BODY ── */
+.card-body{padding:0 14px 6px}
+
+.info-row{
+  display:flex;align-items:flex-start;gap:7px;
+  margin-bottom:5px;font-size:13px;color:var(--dark);
+}
+.info-row .ico{flex-shrink:0;font-size:14px;margin-top:1px}
+.info-row b{font-weight:600}
+
+.items-box{
+  background:var(--light);border-radius:10px;
+  padding:9px 11px;margin:8px 0;font-size:12px;
+  border:1px solid var(--border);line-height:1.7;
+}
+.item-line{display:flex;gap:6px}
+.item-qty{font-weight:700;color:var(--brand);min-width:20px}
+.item-mod{font-size:11px;color:var(--mid);padding-left:22px;font-style:italic}
+
+.pago-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:7px 0;border-top:1px dashed var(--border);margin-top:6px;
+}
+.total-txt{font-size:15px;font-weight:700;color:var(--dark)}
+.badge-pago{
+  padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;
+}
+.badge-yape{background:#EDE9FE;color:#6D28D9}
+.badge-ef  {background:#FEF3C7;color:#92400E}
+
+/* ── ACTIONS ── */
+.card-actions{
+  display:flex;gap:8px;padding:10px 14px 14px;
+}
+.btn-check{
+  flex:1;padding:11px 12px;border-radius:10px;border:none;
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;transition:.18s;display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn-check.check-pending{
+  background:var(--success-bg);color:#2D7A4F;border:1.5px solid #2D7A4F;
+}
+.btn-check.check-pending:hover{background:#2D7A4F;color:#fff}
+.btn-check.check-ready{
+  background:#2D7A4F;color:#fff;
+}
+.btn-check.check-ready:hover{background:#1A4731}
+
+.btn-deliver{
+  flex:1;padding:11px 12px;border-radius:10px;border:none;
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;transition:.18s;
+  background:var(--brand);color:#fff;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn-deliver:hover{background:var(--brand-dark)}
+.btn-deliver:disabled{background:#E8DDD5;color:#bbb;cursor:not-allowed}
+
+/* ── CONFIRM OVERLAY ── */
+.confirm-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(26,18,8,.6);z-index:300;
+  align-items:center;justify-content:center;
+  padding:20px;backdrop-filter:blur(4px);
+}
+.confirm-overlay.open{display:flex}
+.confirm-box{
+  background:#fff;border-radius:18px;padding:28px 24px;
+  width:100%;max-width:340px;text-align:center;
+  animation:popIn .2s cubic-bezier(.22,1,.36,1);
+}
+@keyframes popIn{from{transform:scale(.93);opacity:0}to{transform:scale(1);opacity:1}}
+.confirm-icon{font-size:48px;margin-bottom:10px}
+.confirm-title{font-family:'Playfair Display',serif;font-size:20px;margin-bottom:8px}
+.confirm-msg{font-size:13px;color:var(--mid);line-height:1.5;margin-bottom:20px}
+.confirm-btns{display:flex;gap:10px}
+.btn-cancel{
+  flex:1;padding:12px;border-radius:10px;
+  border:1.5px solid var(--border);background:#fff;
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;
+  color:var(--mid);cursor:pointer;transition:.15s;
+}
+.btn-cancel:hover{background:var(--light)}
+.btn-confirm{
+  flex:1;padding:12px;border-radius:10px;border:none;
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  color:#fff;cursor:pointer;transition:.15s;
+}
+.btn-confirm.c-danger{background:var(--brand)}
+.btn-confirm.c-danger:hover{background:var(--brand-dark)}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#1A1208;color:#fff;border-radius:10px;
+  padding:11px 22px;font-size:13px;font-weight:600;
+  opacity:0;transition:.3s;pointer-events:none;z-index:999;
+  white-space:nowrap;max-width:90vw;text-align:center;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── LOADER ── */
+.loader-wrap{text-align:center;padding:48px 20px;color:var(--mid);font-size:14px}
+.spinner{
+  width:36px;height:36px;border:3px solid var(--border);
+  border-top-color:#2D7A4F;border-radius:50%;
+  animation:spin 0.8s linear infinite;margin:0 auto 12px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── CONN DOT ── */
+.conn-dot{
+  width:8px;height:8px;border-radius:50%;background:#ccc;
+  display:inline-block;margin-right:4px;
+}
+.conn-dot.on{background:#6EE7B7}
+
+@media(max-width:400px){
+  .stats-bar{grid-template-columns:repeat(3,1fr)}
+  .stat-num{font-size:22px}
+  .card-actions{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ LOGIN ══════════════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <span class="login-icon">🛵</span>
+    <div class="login-title">La Cazuela</div>
+    <div class="login-sub">Portal del Repartidor</div>
+    <input class="login-input" id="l-user" type="text" placeholder="Usuario" autocomplete="username"/>
+    <input class="login-input" id="l-pass" type="password" placeholder="Contraseña" autocomplete="current-password"/>
+    <button class="login-btn" onclick="doLogin()">Ingresar</button>
+    <div class="login-err" id="login-err">Usuario o contraseña incorrectos</div>
+  </div>
+</div>
+
+<!-- ══════════════════ APP ══════════════════ -->
+<div id="app-screen">
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-icon">🛵</span>
+      <div>
+        <div class="topbar-title">La Cazuela — Repartidor</div>
+        <div class="topbar-sub"><span class="conn-dot" id="conn-dot"></span><span id="conn-txt">Conectando...</span></div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="doLogout()">Salir</button>
+  </div>
+
+  <div class="container">
+
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stat-card s-pending">
+        <div class="stat-num" id="cnt-pending">0</div>
+        <div class="stat-lbl">Pendientes</div>
+      </div>
+      <div class="stat-card s-ready">
+        <div class="stat-num" id="cnt-ready">0</div>
+        <div class="stat-lbl">Listos</div>
+      </div>
+      <div class="stat-card s-done">
+        <div class="stat-num" id="cnt-done">0</div>
+        <div class="stat-lbl">Entregados</div>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filter-tabs">
+      <button class="f-tab active" id="tab-all"       onclick="setFilter('all')">Todos <span class="f-cnt" id="fc-all">0</span></button>
+      <button class="f-tab"        id="tab-pending"   onclick="setFilter('pending')">⏳ Pendiente <span class="f-cnt" id="fc-pending">0</span></button>
+      <button class="f-tab"        id="tab-ready"     onclick="setFilter('ready')">✅ Listo <span class="f-cnt" id="fc-ready">0</span></button>
+      <button class="f-tab"        id="tab-delivered" onclick="setFilter('delivered')">📦 Entregado <span class="f-cnt" id="fc-delivered">0</span></button>
+    </div>
+
+    <!-- Lista -->
+    <div id="pedidos-wrap">
+      <div class="loader-wrap">
+        <div class="spinner"></div>
+        Cargando pedidos...
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════ CONFIRM ══════ -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-icon" id="confirm-icon">🗑️</div>
+    <div class="confirm-title" id="confirm-title">¿Eliminar pedido?</div>
+    <div class="confirm-msg"   id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <button class="btn-cancel"  onclick="closeConfirm()">Cancelar</button>
+      <button class="btn-confirm c-danger" id="confirm-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ TOAST ══════ -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+// CREDENCIALES REPARTIDOR
+// ══════════════════════════════════════════
+const REPARTIDOR_DEFAULT = { user:'repartidor', pass:'repartidor123' };
+
+function getCreds(){
+  return JSON.parse(localStorage.getItem('cazuela_rep_creds') || 'null') || REPARTIDOR_DEFAULT;
+}
+
+function doLogin(){
+  const u = document.getElementById('l-user').value.trim();
+  const p = document.getElementById('l-pass').value;
+  const c = getCreds();
+  if(u === c.user && p === c.pass){
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display   = 'block';
+    initApp();
+  } else {
+    document.getElementById('login-err').classList.add('show');
+    document.getElementById('l-pass').value = '';
+  }
+}
+
+function doLogout(){
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display   = 'none';
+  document.getElementById('l-user').value = '';
+  document.getElementById('l-pass').value = '';
+}
+
+document.getElementById('l-pass').addEventListener('keydown', e => {
+  if(e.key === 'Enter') doLogin();
+});
+document.getElementById('l-user').addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('l-pass').focus();
+});
+
+// ══════════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════════
+let allPedidos   = [];   // todos los pedidos del snapshot
+let filterActive = 'all';
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+function initApp(){
+  if(window._firebaseReady){
+    startListening();
+  } else {
+    document.addEventListener('firebaseReady', startListening, { once: true });
+  }
+}
+
+function startListening(){
+  const { _db:db, _ref:ref, _onValue:onValue } = window;
+  document.getElementById('conn-dot').classList.add('on');
+  document.getElementById('conn-txt').textContent = 'Conectado en vivo';
+
+  onValue(ref(db,'pedidos'), snap => {
+    if(!snap.exists()){
+      allPedidos = [];
+    } else {
+      allPedidos = Object.entries(snap.val())
+        .map(([key, val]) => ({ ...val, _key: key }))
+        .sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+    }
+    updateStats();
+    renderPedidos();
+  });
+}
+
+// ══════════════════════════════════════════
+// FILTRO
+// ══════════════════════════════════════════
+function setFilter(f){
+  filterActive = f;
+  ['all','pending','ready','delivered'].forEach(id => {
+    document.getElementById('tab-'+id).classList.toggle('active', id === f);
+  });
+  renderPedidos();
+}
+
+function getStatus(p){
+  if(p.entregado) return 'delivered';
+  if(p.listo)     return 'ready';
+  return 'pending';
+}
+
+// ══════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════
+function updateStats(){
+  const pend = allPedidos.filter(p => getStatus(p) === 'pending').length;
+  const rdy  = allPedidos.filter(p => getStatus(p) === 'ready').length;
+  const done = allPedidos.filter(p => getStatus(p) === 'delivered').length;
+
+  document.getElementById('cnt-pending').textContent   = pend;
+  document.getElementById('cnt-ready').textContent     = rdy;
+  document.getElementById('cnt-done').textContent      = done;
+  document.getElementById('fc-all').textContent        = allPedidos.length;
+  document.getElementById('fc-pending').textContent    = pend;
+  document.getElementById('fc-ready').textContent      = rdy;
+  document.getElementById('fc-delivered').textContent  = done;
+}
+
+// ══════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════
+function renderPedidos(){
+  const wrap = document.getElementById('pedidos-wrap');
+  const filtered = filterActive === 'all'
+    ? allPedidos
+    : allPedidos.filter(p => getStatus(p) === filterActive);
+
+  if(filtered.length === 0){
+    const msgs = {
+      all:       ['📋','Sin pedidos aún','Cuando lleguen pedidos aparecerán aquí.'],
+      pending:   ['⏳','Sin pendientes','¡Todo al día! No hay pedidos en espera.'],
+      ready:     ['✅','Ninguno listo aún','Los pedidos listos para entregar aparecerán aquí.'],
+      delivered: ['📦','Sin entregados','Los pedidos completados aparecerán aquí.'],
+    };
+    const [ico, t, s] = msgs[filterActive];
+    wrap.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">${ico}</div>
+        <div class="empty-title">${t}</div>
+        <div class="empty-sub">${s}</div>
+      </div>`;
+    return;
+  }
+
+  wrap.innerHTML = '';
+  filtered.forEach(p => {
+    const status = getStatus(p);
+    const card   = document.createElement('div');
+    card.className = 'pedido-card'
+      + (status === 'ready'     ? ' is-ready'     : '')
+      + (status === 'delivered' ? ' is-delivered'  : '');
+
+    // Construir items
+    const itemsHtml = (p.items||[]).map(it => `
+      <div class="item-line">
+        <span class="item-qty">${it.qty}x</span>
+        <span>${it.name}</span>
+      </div>
+      ${it.mods && it.mods.length ? `<div class="item-mod">↳ ${it.mods.join(' · ')}</div>` : ''}
+    `).join('');
+
+    const badgePago = p.pago === 'yape'
+      ? '<span class="badge-pago badge-yape">Yape/Plin</span>'
+      : '<span class="badge-pago badge-ef">Efectivo</span>';
+
+    const badgeStatus = status === 'ready'
+      ? '<span class="badge-status b-ready">✅ Listo</span>'
+      : status === 'delivered'
+      ? '<span class="badge-status b-done">📦 Entregado</span>'
+      : '<span class="badge-status b-pending">⏳ Pendiente</span>';
+
+    // Botón listo/pendiente
+    let checkBtn = '';
+    if(status !== 'delivered'){
+      if(status === 'ready'){
+        checkBtn = `<button class="btn-check check-ready" onclick="toggleListo('${p._key}', false)">✅ Listo para entregar</button>`;
+      } else {
+        checkBtn = `<button class="btn-check check-pending" onclick="toggleListo('${p._key}', true)">☑ Marcar como listo</button>`;
+      }
+    }
+
+    // Botón entregar/eliminar
+    let deliverBtn = '';
+    if(status !== 'delivered'){
+      deliverBtn = `<button class="btn-deliver" onclick="confirmarEntrega('${p._key}','${(p.num||'?').replace(/'/g,"\\'")}','${(p.nombre||'').replace(/'/g,"\\'")}')">🛵 Entregado — Eliminar</button>`;
+    } else {
+      deliverBtn = `<button class="btn-deliver" style="background:#ccc;cursor:not-allowed" disabled>📦 Ya entregado</button>`;
+    }
+
+    card.innerHTML = `
+      <div class="ready-stripe"></div>
+      <div class="card-hdr">
+        <div class="card-hdr-left">
+          <span class="ped-num">#${p.num||'?'}</span>
+          <span class="ped-time">🕐 ${p.hora||''} · ${p.fecha||''}</span>
+        </div>
+        ${badgeStatus}
+      </div>
+      <div class="card-body">
+        <div class="info-row"><span class="ico">👤</span><span><b>${p.nombre||''}</b> &nbsp;📞 ${p.cel||''}</span></div>
+        <div class="info-row"><span class="ico">📍</span><span>${p.dir||''}${p.ref?' <span style="color:var(--mid);">('+p.ref+')</span>':''}</span></div>
+        ${p.nota ? `<div class="info-row"><span class="ico">📝</span><span style="color:var(--mid)">${p.nota}</span></div>` : ''}
+        <div class="items-box">${itemsHtml}</div>
+        <div class="pago-row">
+          <span class="total-txt">S/ ${Number(p.total||0).toFixed(2)}</span>
+          ${badgePago}
+        </div>
+      </div>
+      <div class="card-actions">
+        ${checkBtn}
+        ${deliverBtn}
+      </div>`;
+
+    wrap.appendChild(card);
+  });
+}
+
+// ══════════════════════════════════════════
+// MARCAR LISTO (check)
+// ══════════════════════════════════════════
+async function toggleListo(key, listo){
+  if(!window._firebaseReady){ showToast('⚠️ Sin conexión'); return; }
+  try{
+    await window._update(window._ref(window._db, 'pedidos/'+key), { listo });
+    showToast(listo ? '✅ Pedido marcado como listo' : '↩️ Marcado como pendiente');
+  } catch(e){ showToast('❌ Error: '+e.message); }
+}
+
+// ══════════════════════════════════════════
+// CONFIRMAR ENTREGA → ELIMINAR
+// ══════════════════════════════════════════
+function confirmarEntrega(key, num, nombre){
+  document.getElementById('confirm-icon').textContent  = '🛵';
+  document.getElementById('confirm-title').textContent = '¿Confirmar entrega?';
+  document.getElementById('confirm-msg').textContent   =
+    `Pedido #${num} de ${nombre} será marcado como entregado y eliminado de la lista.`;
+  document.getElementById('confirm-ok').textContent    = '✅ Sí, entregado';
+  document.getElementById('confirm-ok').onclick = () => { closeConfirm(); eliminarPedido(key, num); };
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+
+async function eliminarPedido(key, num){
+  if(!window._firebaseReady){ showToast('⚠️ Sin conexión'); return; }
+  try{
+    await window._remove(window._ref(window._db, 'pedidos/'+key));
+    showToast(`🎉 Pedido #${num} entregado y eliminado`);
+  } catch(e){ showToast('❌ Error al eliminar: '+e.message); }
+}
+
+function closeConfirm(){
+  document.getElementById('confirm-overlay').classList.remove('open');
+}
+
+// ══════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════
+let _toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
